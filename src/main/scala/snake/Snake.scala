@@ -1,36 +1,35 @@
 package snake
 
 import chisel3.*
-import chisel3.util.MixedVecInit
 import snake.bundle.SevenSeg
 import snake.module.{SnakeDisplay, Ticker}
 
 class SnakeIO extends Bundle {
-  //  方向键输入
-  //      暂停显示时间
+  // 方向键输入
+  //     暂停显示时间
   val up     = Input(Bool())
-  //      改变蛇身长度
+  //     改变蛇身长度
   val down   = Input(Bool())
-  //      改变移动速度
+  //     改变移动速度
   val left   = Input(Bool())
-  //      切换手动/自动控制移动模式
+  //     切换手动/自动控制移动模式
   val right  = Input(Bool())
-  //      手动改变移动模式
+  //     手动改变移动模式
   val center = Input(Bool())
 
-  //  七段数码管输出
+  // 七段数码管输出
   val sevenSeg = Output(new SevenSeg)
 }
 
 class Snake extends Module {
   val io = IO(new SnakeIO)
 
-  //  暂停移动蛇 移动(寄存器写入信号)
+  // 暂停移动蛇 移动移动蛇(寄存器写入信号)
   val pause      = RegInit(Bool(), false.B)
   val move       = RegInit(Bool(), false.B)
-  //  自动切换模式
+  // 自动切换模式
   val auto       = RegInit(Bool(), false.B)
-  //  移动模式
+  // 移动模式
   val mode0      = VecInit(
     "h70".U,
     "h60".U,
@@ -99,67 +98,65 @@ class Snake extends Module {
     "h10".U,
     "h00".U
   )
-  val modeTable  = MixedVecInit(mode0, mode1, mode2, mode3, mode4)
   val modeLength = VecInit(mode0.length.U, mode1.length.U, mode2.length.U, mode3.length.U, mode4.length.U)
-  //  当前选中的移动模式
+  // 当前选中的移动模式
   val mode       = RegInit(UInt(3.W), 0.U)      // 5种移动模式 mode <- [0,1,2,3,4]
   val step       = RegInit(UInt(64.W), 0.U)     // 当前处于选中移动模式的第几步 index < mode.length
-  val ledSeg     = RegInit(UInt(8.W), mode0(0)) // modeTable[mode][step]
-  //  蛇身长度
+  val ledSeg     = RegInit(UInt(8.W), mode0(0)) // mode01234[mode][step]
+  // 蛇身长度
   val length     = RegInit(UInt(3.W), 3.U)
-
-  //  控制蛇移动速度
-  val speedTicker10 = Module(new Ticker(10))
-  val speedTicker2  = Module(new Ticker(2))
-  val speedTicker1  = Module(new Ticker(1))
-  speedTicker10.io.en := ~pause
-  speedTicker2.io.en  := ~pause
-  speedTicker1.io.en  := ~pause
-  val speedTickerSelector = RegInit(UInt(2.W), 0.U)
-  // 切换时钟
-  when(io.left) {
-    when(speedTickerSelector === 2.U) { speedTickerSelector := 0.U }
-      .otherwise { speedTickerSelector := speedTickerSelector + 1.U }
-  }
-  // 选择时钟
-  when(speedTickerSelector === 0.U) { move := speedTicker10.io.tck }
-    .elsewhen(speedTickerSelector === 1.U) { move := speedTicker1.io.tck }
-    .otherwise { move := speedTicker1.io.tck }
-
-  // 蛇移动起来
-  when(move) {
-    when(step === (modeLength(mode) - 1.U)) {
-      // 移动到了当前模式的最后一步
-      step := 0.U
-
-      when(auto) {
-        // 切换到下一个移动模式
-        when(mode === 4.U) { mode := 0.U }
-          .otherwise { mode := mode + 1.U }
-      }
-    }.otherwise {
-      step := step + 1.U
-    }
-  }
-
-  // 改变移动模式
-  when(io.center) {
-    when(!auto) {
-      step := 0.U
-
-      when(mode === 4.U) { mode := 0.U }
-        .otherwise { mode := mode + 1.U }
-    }
-  }
 
   // 自动模式
   when(io.right) { auto := ~auto }
 
-  // 改变蛇身长度
-  when(io.down) {
-    when(length === 7.U) { length := 3.U }
-      .otherwise { length := length + 1.U }
+  // 控制蛇移动速度
+  val speed0 = Module(new Ticker(10))
+  val speed1 = Module(new Ticker(2))
+  val speed2 = Module(new Ticker(1))
+  speed0.io.en := ~pause
+  speed1.io.en := ~pause
+  speed2.io.en := ~pause
+  val speedSelector = RegInit(UInt(2.W), 0.U)
+  // 切换时钟
+  when(io.left) { speedSelector := Mux(speedSelector === 2.U, 0.U, speedSelector + 1.U) }
+  // 选择时钟
+  when(speedSelector === 0.U) { move := speed0.io.tck }
+    .elsewhen(speedSelector === 1.U) { move := speed2.io.tck }
+    .otherwise { move := speed2.io.tck }
+
+  // 蛇移动起来
+  //     切换到下一个移动模式
+  private def gotoNextMode() = { mode := Mux(mode === 4.U, 0.U, mode + 1.U) }
+
+  //     移动
+  when(move) {
+    when(step === (modeLength(mode) - 1.U)) {
+      // 移动到了当前模式的最后一步
+      step := 0.U
+      when(auto) { gotoNextMode() }
+    }.otherwise {
+      // 移动到当前模式的下一步
+      step := step + 1.U
+    }
   }
+
+  //     改变移动模式
+  when(io.center) {
+    when(!auto) {
+      step := 0.U
+      gotoNextMode()
+    }
+  }
+
+  // 根据 mode 和 step 更新 ledSeg
+  when(mode === 0.U) { ledSeg := mode0(step) }
+    .elsewhen(mode === 1.U) { ledSeg := mode1(step) }
+    .elsewhen(mode === 2.U) { ledSeg := mode2(step) }
+    .elsewhen(mode === 3.U) { ledSeg := mode3(step) }
+    .otherwise { ledSeg := mode4(step) }
+
+  // 改变蛇身长度
+  when(io.down) { length := Mux(length === 7.U, 3.U, length + 1.U) }
 
   val display = Module(new SnakeDisplay)
   display.io.move   := move

@@ -6,7 +6,7 @@ import snake.bundle.SevenSeg
 
 class SnakeDisplayIO extends Bundle {
   // 移动
-  val move     = Input(Bool())
+  val move   = Input(Bool())
   // 移动模式
   //     moveMode(ledSeg): 高4位为led号 低4位为数码管段号seg
   //
@@ -28,7 +28,7 @@ class SnakeDisplayIO extends Bundle {
   //             7               6               5               4               3               2               1               0
   val legSeg = Input(UInt(8.W))
   // 蛇身长度 3-7
-  val length   = Input(UInt(3.W))
+  val length = Input(UInt(3.W))
 
   // 数码管
   val sevenSeg = Output(new SevenSeg)
@@ -95,11 +95,11 @@ class SnakeDisplay extends Module {
     }
   }
 
-  // 刷新数码管 100Hz
+  // 刷新数码管 800Hz
   val selector  = RegInit(UInt(3.W), 0.U)
-  val ticker100 = Module(new Ticker(100))
-  ticker100.io.en := true.B
-  when(ticker100.io.tck) {
+  val ticker800 = Module(new Ticker(800))
+  ticker800.io.en := true.B
+  when(ticker800.io.tck) {
     when(selector === 7.U) { selector := 0.U }
       .otherwise { selector := selector + 1.U }
   }
