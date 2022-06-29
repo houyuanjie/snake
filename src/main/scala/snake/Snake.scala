@@ -100,7 +100,7 @@ class Snake extends Module {
   )
   val modeLength = VecInit(mode0.length.U, mode1.length.U, mode2.length.U, mode3.length.U, mode4.length.U)
   // 当前选中的移动模式
-  val mode       = RegInit(UInt(3.W), 0.U)      // 5种移动模式 mode <- [0,1,2,3,4]
+  val mode       = RegInit(UInt(3.W), 0.U)      // 5 种移动模式 mode <- [0,1,2,3,4]
   val step       = RegInit(UInt(64.W), 0.U)     // 当前处于选中移动模式的第几步 index < mode.length
   val ledSeg     = RegInit(UInt(8.W), mode0(0)) // mode01234[mode][step]
   // 蛇身长度
@@ -158,13 +158,13 @@ class Snake extends Module {
   // 改变蛇身长度
   when(io.down) { length := Mux(length === 7.U, 3.U, length + 1.U) }
 
-  val display = Module(new SnakeDisplay)
-  display.io.move   := move
-  display.io.legSeg := ledSeg
-  display.io.length := length
+  val snakeDisplay = Module(new SnakeDisplay)
+  snakeDisplay.io.move   := move
+  snakeDisplay.io.ledSeg := ledSeg
+  snakeDisplay.io.length := length
 
   // todo: 实现暂停显示时间 目前只能输出移动蛇
-  io.sevenSeg := display.io.sevenSeg
+  io.sevenSeg := snakeDisplay.io.sevenSeg
 }
 
 object Snake {

@@ -24,4 +24,12 @@ object Ticker {
   // 全局 100MHz 时钟
   val FREQ = 100000000
 
+  // 持续节拍信号的构造器
+  def keepBeating(freq: Int) = {
+    val ticker = Module(new Ticker(freq))
+    ticker.io.en := true.B
+
+    ticker.io.tck
+  }
+
 }

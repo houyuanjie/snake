@@ -1,0 +1,5 @@
+package snake
+
+object Util {
+
+}

@@ -26,20 +26,19 @@ class SnakeDisplayIO extends Bundle {
   //         === 3 ===  [7]  === 3 ===  [7]  === 3 ===  [7]  === 3 ===  [7]  === 3 ===  [7]  === 3 ===  [7]  === 3 ===  [7]  === 3 ===  [7]
   //
   //             7               6               5               4               3               2               1               0
-  val legSeg = Input(UInt(8.W))
+  val ledSeg = Input(UInt(8.W))
   // 蛇身长度 3-7
   val length = Input(UInt(3.W))
 
   // 数码管
   val sevenSeg = Output(new SevenSeg)
-
 }
 
 class SnakeDisplay extends Module {
   val io = IO(new SnakeDisplayIO)
 
   // 使用移位寄存器缓存来增加蛇的长度
-  val delay  = ShiftRegisters(io.legSeg, 7, io.move)
+  val delay  = ShiftRegisters(io.ledSeg, 7, io.move)
   val snake3 = delay.take(3)
   val snake4 = delay.take(4)
   val snake5 = delay.take(5)
@@ -47,30 +46,23 @@ class SnakeDisplay extends Module {
   val snake7 = delay.take(7)
 
   // 寄存蛇身
-  val led7 = RegInit(UInt(8.W), 0.U)
-  val led6 = RegInit(UInt(8.W), 0.U)
-  val led5 = RegInit(UInt(8.W), 0.U)
-  val led4 = RegInit(UInt(8.W), 0.U)
-  val led3 = RegInit(UInt(8.W), 0.U)
-  val led2 = RegInit(UInt(8.W), 0.U)
-  val led1 = RegInit(UInt(8.W), 0.U)
-  val led0 = RegInit(UInt(8.W), 0.U)
+  val led7   = RegInit(UInt(8.W), 0.U)
+  val led6   = RegInit(UInt(8.W), 0.U)
+  val led5   = RegInit(UInt(8.W), 0.U)
+  val led4   = RegInit(UInt(8.W), 0.U)
+  val led3   = RegInit(UInt(8.W), 0.U)
+  val led2   = RegInit(UInt(8.W), 0.U)
+  val led1   = RegInit(UInt(8.W), 0.U)
+  val led0   = RegInit(UInt(8.W), 0.U)
+  val ledSeq = Seq(led0, led1, led2, led3, led4, led5, led6, led7)
 
-  private def cleanLedReg() = {
-    led7 := 0.U(8.W)
-    led6 := 0.U(8.W)
-    led5 := 0.U(8.W)
-    led4 := 0.U(8.W)
-    led3 := 0.U(8.W)
-    led2 := 0.U(8.W)
-    led1 := 0.U(8.W)
-    led0 := 0.U(8.W)
-  }
+  private def cleanLedReg() = ledSeq.foreach { led => led := 0.U(8.W) }
 
-  private def readLedReg(ledSeg: UInt) = {
+  private def fillLedReg(ledSeg: UInt) = {
+    val led = ledSeg(7, 4)
     val seg = (1.U << ledSeg(3, 0)).asUInt
 
-    switch(ledSeg(7, 4)) {
+    switch(led) {
       is(7.U) { led7 := led7 | seg }
       is(6.U) { led6 := led6 | seg }
       is(5.U) { led5 := led5 | seg }
@@ -82,27 +74,23 @@ class SnakeDisplay extends Module {
     }
   }
 
-  // 当移动时, 清空led, 重新从寄存器读取
+  // 当移动时, 清空寄存器, 再按不同长度载入寄存器
   when(io.move) {
     cleanLedReg()
 
     switch(io.length) {
-      is(3.U) { snake3.foreach(readLedReg) }
-      is(4.U) { snake4.foreach(readLedReg) }
-      is(5.U) { snake5.foreach(readLedReg) }
-      is(6.U) { snake6.foreach(readLedReg) }
-      is(7.U) { snake7.foreach(readLedReg) }
+      is(3.U) { snake3.foreach(fillLedReg) }
+      is(4.U) { snake4.foreach(fillLedReg) }
+      is(5.U) { snake5.foreach(fillLedReg) }
+      is(6.U) { snake6.foreach(fillLedReg) }
+      is(7.U) { snake7.foreach(fillLedReg) }
     }
   }
 
   // 刷新数码管 800Hz
-  val selector  = RegInit(UInt(3.W), 0.U)
-  val ticker800 = Module(new Ticker(800))
-  ticker800.io.en := true.B
-  when(ticker800.io.tck) {
-    when(selector === 7.U) { selector := 0.U }
-      .otherwise { selector := selector + 1.U }
-  }
+  val selector = RegInit(UInt(3.W), 0.U)
+  val refresh  = Ticker.keepBeating(800)
+  when(refresh) { selector := Mux(selector === 7.U, 0.U, selector + 1.U) }
 
   // 输出
   io.sevenSeg.an := ~(1.U << selector).asUInt
