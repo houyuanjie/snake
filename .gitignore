@@ -1,0 +1,11 @@
+# IDE
+.bloop/
+.bsp/
+.idea/
+.metals/
+.vscode/
+
+# SBT
+project/
+target/
+!project/build.properties
